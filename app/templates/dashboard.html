@@ -1,0 +1,50 @@
+﻿{% extends "base.html" %}
+{% block title %}Dashboard | Comment Lens{% endblock %}
+{% block content %}
+
+<div class="dash-header">
+  <div>
+    <p class="eyebrow">YOUTUBE / DASHBOARD</p>
+    <h1>Your videos</h1>
+    <p class="muted-text">Select a video to analyse its comments for sentiment and cyberbullying.</p>
+  </div>
+</div>
+
+{% if videos %}
+  <ul class="video-grid" id="video-list">
+    {% for video in videos %}
+      <li class="video-card" id="video-card-{{ video.video_id }}">
+        {% if video.thumbnail_url %}
+          <div class="video-thumb-wrap">
+            <img class="video-thumb" src="{{ video.thumbnail_url }}" alt="Thumbnail for {{ video.title | e }}" loading="lazy" width="120" height="90">
+          </div>
+        {% else %}
+          <div class="video-thumb-wrap video-thumb-placeholder" aria-hidden="true"></div>
+        {% endif %}
+        <div class="video-meta">
+          <p class="video-title">{{ video.title | e }}</p>
+          {% if video.published_at %}
+            <p class="video-date muted-text">{{ video.published_at[:10] }}</p>
+          {% endif %}
+          <a class="primary-button primary-link analyse-btn"
+             href="{{ url_for('analysis.analyze_video', video_id=video.video_id) }}"
+             id="analyse-btn-{{ video.video_id }}">
+            Analyse comments
+          </a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if next_page_token %}
+    <p class="muted-text page-note">Showing the first 25 videos. YouTube API pagination is available if needed.</p>
+  {% endif %}
+{% else %}
+  <div class="empty-state" id="empty-videos">
+    <p class="empty-icon" aria-hidden="true">&#9654;</p>
+    <p>No videos found for this YouTube channel.</p>
+    <p class="muted-text">If you have just connected your account, try refreshing this page.</p>
+    <a href="{{ url_for('analysis.dashboard') }}" class="primary-button primary-link">Refresh</a>
+  </div>
+{% endif %}
+
+{% endblock %}

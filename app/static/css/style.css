@@ -1,0 +1,82 @@
+:root {
+  color-scheme: light;
+  --ink: #202824;
+  --muted: #63716b;
+  --paper: #f5f5ef;
+  --surface: #ffffff;
+  --green: #1f6650;
+  --green-dark: #164c3b;
+  --coral: #c95d47;
+  --line: #d9ded7;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image: radial-gradient(#d7ddd3 0.65px, transparent 0.65px);
+  background-size: 16px 16px;
+}
+
+a { color: var(--green-dark); text-underline-offset: 3px; }
+
+.topbar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 max(24px, calc((100vw - 1120px) / 2));
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand { color: var(--ink); font-weight: 750; text-decoration: none; }
+.brand span, .eyebrow { color: var(--green); font-size: 0.72rem; font-weight: 750; letter-spacing: 0.08em; }
+.brand span { margin-left: 8px; }
+.topbar nav { display: flex; align-items: center; gap: 20px; }
+.nav-user { color: var(--muted); }
+.inline-form { display: inline; }
+.text-button { padding: 0; border: 0; background: none; color: var(--green-dark); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+.page-shell { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 64px 0; }
+.auth-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); align-items: center; gap: clamp(32px, 8vw, 112px); }
+.auth-note { max-width: 480px; animation: rise-in 420ms ease-out both; }
+.auth-note h1, .welcome-panel h1 { max-width: 11ch; margin: 18px 0; font-size: 3.5rem; line-height: 1.05; }
+.auth-note > p:last-child, .welcome-panel > p:last-child { max-width: 42ch; color: var(--muted); line-height: 1.7; }
+.auth-panel { padding: 32px; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--green); box-shadow: 0 14px 36px rgb(32 40 36 / 7%); animation: rise-in 520ms 80ms ease-out both; }
+.auth-panel h2 { margin: 0 0 8px; font-size: 1.55rem; }
+.form-hint, .form-footer { color: var(--muted); font-size: 0.92rem; }
+.field { display: grid; gap: 7px; margin: 20px 0; }
+.field label { font-size: 0.9rem; font-weight: 650; }
+.field input { width: 100%; min-height: 44px; padding: 10px 12px; color: var(--ink); background: #fcfcf9; border: 1px solid #aeb9b0; border-radius: 3px; font: inherit; }
+.field input:focus { outline: 3px solid rgb(31 102 80 / 18%); border-color: var(--green); }
+.field-error { color: #a53e2d; }
+.primary-button { min-height: 46px; padding: 0 18px; border: 0; border-radius: 3px; background: var(--green); color: white; font: inherit; font-weight: 700; cursor: pointer; }
+.primary-button:hover { background: var(--green-dark); }
+.primary-link { display: inline-flex; align-items: center; margin-top: 12px; text-decoration: none; }
+.connection-status { width: fit-content; padding: 10px 12px; border-left: 3px solid var(--green); background: #e6f0e9; color: var(--green-dark); }
+.form-footer { margin: 22px 0 0; }
+.flash-stack { margin-bottom: 24px; }
+.flash { padding: 12px 15px; border-left: 3px solid var(--green); background: var(--surface); }
+.flash-error { border-left-color: var(--coral); }
+.welcome-panel { min-height: 280px; padding: clamp(24px, 6vw, 64px); background: var(--surface); border-left: 5px solid var(--green); }
+
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 720px) {
+  .topbar { padding: 0 18px; }
+  .page-shell { width: min(100% - 32px, 520px); padding: 36px 0; }
+  .auth-layout { grid-template-columns: 1fr; gap: 28px; }
+  .auth-note h1 { max-width: 14ch; font-size: 2.45rem; }
+  .auth-panel { padding: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}

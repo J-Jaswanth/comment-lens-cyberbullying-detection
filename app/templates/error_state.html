@@ -1,0 +1,12 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ title }} | Comment Lens{% endblock %}
+{% block content %}
+<div class="error-state-page" id="error-state">
+  <p class="eyebrow">ERROR</p>
+  <h1>{{ title }}</h1>
+  <p class="muted-text">{{ message }}</p>
+  {% if action_url and action_label %}
+    <a class="primary-button primary-link" href="{{ action_url }}" id="error-action-btn">{{ action_label }}</a>
+  {% endif %}
+</div>
+{% endblock %}

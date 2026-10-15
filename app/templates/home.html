@@ -1,0 +1,15 @@
+﻿{% extends "base.html" %}
+{% block title %}Your workspace | Comment Lens{% endblock %}
+{% block content %}
+<section class="welcome-panel">
+  <p class="eyebrow">ACCOUNT / READY</p>
+  <h1>Welcome, {{ current_user.username }}.</h1>
+  {% if youtube_connected %}
+    <p class="connection-status">YouTube account connected.</p>
+    <a class="primary-button primary-link" href="{{ url_for('analysis.dashboard') }}" id="go-dashboard-btn">Go to Dashboard &rarr;</a>
+  {% else %}
+    <p>Connect through Google authorization. You will never enter your Google password in this application.</p>
+    <a class="primary-button primary-link" href="{{ url_for('oauth.connect_google') }}" id="connect-youtube-btn">Connect YouTube with Google</a>
+  {% endif %}
+</section>
+{% endblock %}

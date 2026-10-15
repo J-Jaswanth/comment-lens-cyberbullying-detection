@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Create account | Comment Lens{% endblock %}
+{% block content %}
+<section class="auth-layout">
+  <div class="auth-note">
+    <p class="eyebrow">COMMENT LENS / ACCOUNT</p>
+    <h1>A careful look at online conversation.</h1>
+    <p>Create a project account to keep your future analyses private and organized.</p>
+  </div>
+  <div class="auth-panel">
+    <h2>Create account</h2>
+    <p class="form-hint">Use at least 12 characters for your password.</p>
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {% for field in [form.username, form.email, form.password, form.confirm_password] %}
+        <div class="field">
+          {{ field.label }}
+          {{ field(autocomplete="new-password" if field.type == "PasswordField" else "off") }}
+          {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+        </div>
+      {% endfor %}
+      {{ form.submit(class_="primary-button") }}
+    </form>
+    <p class="form-footer">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+  </div>
+</section>
+{% endblock %}
