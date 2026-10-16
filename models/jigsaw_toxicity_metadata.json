@@ -1,0 +1,229 @@
+{
+  "task": "jigsaw_toxicity_multi_label",
+  "labels": [
+    "toxic",
+    "severe_toxic",
+    "obscene",
+    "threat",
+    "insult",
+    "identity_hate"
+  ],
+  "train_rows": 127656,
+  "validation_rows": 15957,
+  "test_rows": 15958,
+  "macro_precision": 0.4492618184296018,
+  "macro_recall": 0.8251420896460422,
+  "macro_f1": 0.564636612000703,
+  "micro_precision": 0.5670731707317073,
+  "micro_recall": 0.8637770897832817,
+  "micro_f1": 0.6846625766871166,
+  "per_label": {
+    "toxic": {
+      "precision": 0.6485953671759488,
+      "recall": 0.8567708333333334,
+      "f1": 0.738288920056101,
+      "positive_support": 1536
+    },
+    "severe_toxic": {
+      "precision": 0.28725701943844495,
+      "recall": 0.8364779874213837,
+      "f1": 0.42765273311897106,
+      "positive_support": 159
+    },
+    "obscene": {
+      "precision": 0.684257602862254,
+      "recall": 0.8905704307334109,
+      "f1": 0.7738998482549317,
+      "positive_support": 859
+    },
+    "threat": {
+      "precision": 0.23684210526315788,
+      "recall": 0.7297297297297297,
+      "f1": 0.3576158940397351,
+      "positive_support": 37
+    },
+    "insult": {
+      "precision": 0.5648369132856006,
+      "recall": 0.8808933002481389,
+      "f1": 0.6883179835191469,
+      "positive_support": 806
+    },
+    "identity_hate": {
+      "precision": 0.2737819025522042,
+      "recall": 0.7564102564102564,
+      "f1": 0.4020442930153322,
+      "positive_support": 156
+    }
+  },
+  "confusion_matrices": {
+    "toxic": [
+      [
+        13708,
+        713
+      ],
+      [
+        220,
+        1316
+      ]
+    ],
+    "severe_toxic": [
+      [
+        15468,
+        330
+      ],
+      [
+        26,
+        133
+      ]
+    ],
+    "obscene": [
+      [
+        14745,
+        353
+      ],
+      [
+        94,
+        765
+      ]
+    ],
+    "threat": [
+      [
+        15833,
+        87
+      ],
+      [
+        10,
+        27
+      ]
+    ],
+    "insult": [
+      [
+        14604,
+        547
+      ],
+      [
+        96,
+        710
+      ]
+    ],
+    "identity_hate": [
+      [
+        15488,
+        313
+      ],
+      [
+        38,
+        118
+      ]
+    ]
+  },
+  "test_metrics": {
+    "macro_precision": 0.4543804001321548,
+    "macro_recall": 0.8152253689726607,
+    "macro_f1": 0.5657007383067815,
+    "micro_precision": 0.5744398025066464,
+    "micro_recall": 0.8591309287134337,
+    "micro_f1": 0.6885171275748264,
+    "per_label": {
+      "toxic": {
+        "precision": 0.65678391959799,
+        "recall": 0.8598684210526316,
+        "f1": 0.7447293447293447,
+        "positive_support": 1520
+      },
+      "severe_toxic": {
+        "precision": 0.29475982532751094,
+        "recall": 0.8333333333333334,
+        "f1": 0.43548387096774194,
+        "positive_support": 162
+      },
+      "obscene": {
+        "precision": 0.6982358402971216,
+        "recall": 0.8785046728971962,
+        "f1": 0.7780651836523539,
+        "positive_support": 856
+      },
+      "threat": {
+        "precision": 0.2621359223300971,
+        "recall": 0.7297297297297297,
+        "f1": 0.38571428571428573,
+        "positive_support": 37
+      },
+      "insult": {
+        "precision": 0.5797697368421053,
+        "recall": 0.8725247524752475,
+        "f1": 0.6966403162055336,
+        "positive_support": 808
+      },
+      "identity_hate": {
+        "precision": 0.23459715639810427,
+        "recall": 0.717391304347826,
+        "f1": 0.3535714285714286,
+        "positive_support": 138
+      }
+    },
+    "confusion_matrices": {
+      "toxic": [
+        [
+          13755,
+          683
+        ],
+        [
+          213,
+          1307
+        ]
+      ],
+      "severe_toxic": [
+        [
+          15473,
+          323
+        ],
+        [
+          27,
+          135
+        ]
+      ],
+      "obscene": [
+        [
+          14777,
+          325
+        ],
+        [
+          104,
+          752
+        ]
+      ],
+      "threat": [
+        [
+          15845,
+          76
+        ],
+        [
+          10,
+          27
+        ]
+      ],
+      "insult": [
+        [
+          14639,
+          511
+        ],
+        [
+          103,
+          705
+        ]
+      ],
+      "identity_hate": [
+        [
+          15497,
+          323
+        ],
+        [
+          39,
+          99
+        ]
+      ]
+    }
+  },
+  "confidence_note": "These probability outputs are prediction scores and are not treated as calibrated probabilities."
+}

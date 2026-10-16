@@ -14,6 +14,7 @@ To train real production models, provide a labeled CSV and run::
 """
 
 import logging
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,8 @@ logger = logging.getLogger(__name__)
 _MODELS_DIR = Path(__file__).parent.parent.parent / "models"
 _SENTIMENT_MODEL_PATH = _MODELS_DIR / "sentiment_model.joblib"
 _BULLYING_MODEL_PATH = _MODELS_DIR / "bullying_category_model.joblib"
+_TOXICITY_MODEL_PATH = _MODELS_DIR / "jigsaw_toxicity_model.joblib"
+_TOXICITY_LABELS_PATH = _MODELS_DIR / "jigsaw_toxicity_labels.json"
 
 NON_BULLYING_LABEL = "not_bullying"
 REQUIRED_BULLYING_LABELS = {
@@ -80,6 +83,8 @@ def _short_ambiguous_text(text):
 _DEMO_CORPUS = [
     # Positive sentiment, safe (gaming slang, general praise, emoji usage)
     ("Great video, loved it!", "positive", "not_bullying"),
+    ("Great tutorial, very clear!", "positive", "not_bullying"),
+    ("This is brilliant and very clear!", "positive", "not_bullying"),
     ("Amazing content, keep it up!", "positive", "not_bullying"),
     ("This is wonderful, thank you!", "positive", "not_bullying"),
     ("Excellent work, very helpful.", "positive", "not_bullying"),
@@ -220,6 +225,9 @@ class LoadedModels:
     sentiment: object
     bullying: object
     is_demo: bool
+    model_warning: str = ""
+    toxicity: object = None
+    toxicity_labels: list = field(default_factory=list)
 
 
 def load_models() -> LoadedModels:
@@ -229,22 +237,63 @@ def load_models() -> LoadedModels:
     """
     import joblib
 
-    if _SENTIMENT_MODEL_PATH.exists() and _BULLYING_MODEL_PATH.exists():
-        try:
+    toxicity_model = None
+    toxicity_labels = []
+    sentiment = None
+    bullying = None
+
+    try:
+        if _SENTIMENT_MODEL_PATH.exists():
             sentiment = joblib.load(_SENTIMENT_MODEL_PATH)
+        if _BULLYING_MODEL_PATH.exists():
             bullying = joblib.load(_BULLYING_MODEL_PATH)
-            logger.info("Loaded production models from %s", _MODELS_DIR)
-            return LoadedModels(sentiment=sentiment, bullying=bullying, is_demo=False)
-        except Exception:
-            logger.exception(
-                "Could not load production models; falling back to demo model."
+        if _TOXICITY_MODEL_PATH.exists():
+            from app.services.ml_pipeline import JIGSAW_LABELS, JigsawToxicityModel
+
+            toxicity_pipeline = joblib.load(_TOXICITY_MODEL_PATH)
+            toxicity_labels = (
+                json.loads(_TOXICITY_LABELS_PATH.read_text(encoding="utf-8"))
+                if _TOXICITY_LABELS_PATH.exists()
+                else JIGSAW_LABELS
             )
+            toxicity_metadata_path = _MODELS_DIR / "jigsaw_toxicity_metadata.json"
+            toxicity_evaluation = (
+                json.loads(toxicity_metadata_path.read_text(encoding="utf-8"))
+                if toxicity_metadata_path.exists()
+                else {}
+            )
+            toxicity_model = JigsawToxicityModel(
+                pipeline=toxicity_pipeline,
+                labels=toxicity_labels,
+                evaluation=toxicity_evaluation,
+            )
+        if sentiment is not None and bullying is not None:
+            logger.info("Loaded production models from %s", _MODELS_DIR)
+            return LoadedModels(
+                sentiment=sentiment,
+                bullying=bullying,
+                is_demo=False,
+                model_warning="",
+                toxicity=toxicity_model,
+                toxicity_labels=toxicity_labels,
+            )
+    except Exception:
+        logger.exception(
+            "Could not load production models; falling back to demo model."
+        )
 
     _build_demo_models()
     return LoadedModels(
         sentiment=_demo_sentiment_model,
         bullying=_demo_bullying_model,
         is_demo=True,
+        model_warning=(
+            "Illustrative fallback model only for sentiment and bullying: the legacy classifier "
+            "pair is still demo, while a trained Jigsaw toxicity model may be available separately "
+            "for evaluation."
+        ),
+        toxicity=toxicity_model,
+        toxicity_labels=toxicity_labels,
     )
 
 
@@ -261,6 +310,7 @@ class CommentResult:
     bullying_label: str
     bullying_confidence: float
     is_bullying: bool
+    toxicity_scores: dict = field(default_factory=dict)
     needs_review: bool = False
     review_reason: Optional[str] = None
 
@@ -273,6 +323,7 @@ class AnalysisSummary:
     harmful_count: int
     harmful_pct: float
     is_demo: bool
+    model_warning: str = ""
     comments: list = field(default_factory=list)
 
 
@@ -314,6 +365,11 @@ def analyze_comments(
         sentiment_confidence = float(sent.get("confidence", 0.0))
         bullying_confidence = float(bull.get("confidence", 0.0))
         is_bullying = bullying_label != NON_BULLYING_LABEL
+        toxicity_scores = (
+            models.toxicity.predict(text)
+            if models.toxicity is not None
+            else {}
+        )
 
         # Uncertainty & review heuristics. Keep sentiment and cyberbullying as
         # separate predictions; a negative sentiment score alone does not mean
@@ -333,13 +389,22 @@ def analyze_comments(
             min_conf = round(min(sentiment_confidence, bullying_confidence) * 100)
             review_reason = f"Low model confidence ({min_conf}%)"
 
-        if models.is_demo and len(words) <= 4 and not is_bullying:
-            if any(token in normalized_lower for token in ("sub", "subscribe", "bro", "gg", "headshot", "clutch")):
-                sentiment_label = "positive" if sentiment_label == "negative" else sentiment_label
-                if sentiment_label not in {"positive", "negative", "neutral"}:
-                    sentiment_label = "neutral"
-                if sentiment_label == "negative" and not any(token in normalized_lower for token in ("idiot", "stupid", "ugly", "loser", "hate", "die")):
-                    sentiment_label = "neutral"
+        if models.is_demo and len(words) <= 5 and not is_bullying:
+            social_tokens = {
+                "bro",
+                "gg",
+                "fam",
+                "sub",
+                "subscribe",
+                "headshot",
+                "clutch",
+                "support",
+                "love",
+                "like",
+            }
+            if set(words).intersection(social_tokens):
+                needs_review = True
+                review_reason = "Short social-media phrase in demo mode requires human review"
 
         results.append(
             CommentResult(
@@ -350,6 +415,7 @@ def analyze_comments(
                 bullying_label=bullying_label,
                 bullying_confidence=round(bullying_confidence, 4),
                 is_bullying=is_bullying,
+                toxicity_scores=toxicity_scores,
                 needs_review=needs_review,
                 review_reason=review_reason,
             )
@@ -369,5 +435,6 @@ def analyze_comments(
         harmful_count=harmful_count,
         harmful_pct=harmful_pct,
         is_demo=models.is_demo,
+        model_warning=getattr(models, "model_warning", ""),
         comments=results,
     )

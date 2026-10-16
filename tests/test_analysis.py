@@ -1,7 +1,14 @@
 from unittest.mock import MagicMock, patch
 import pytest
+from flask import render_template
 
-from app.services.analysis_service import analyze_comments, load_models
+from app.services.analysis_service import (
+    AnalysisSummary,
+    CommentResult,
+    analyze_comments,
+    load_models,
+)
+from app.services.ml_pipeline import JIGSAW_LABELS, load_jigsaw_toxicity_csv
 from app.services.youtube_api import (
     YouTubeAPIConfigurationError,
     YouTubeAPIError,
@@ -256,6 +263,146 @@ def test_demo_model_maps_unsupported_labels_to_research_categories():
     assert non_harmful.bullying_label == "not_bullying"
     assert non_harmful.is_bullying is False
     assert summary.is_demo is True
+    assert models.model_warning
+    assert "illustrative" in models.model_warning.lower()
+    assert "jigsaw" in models.model_warning.lower()
+
+
+def test_jigsaw_label_contract_is_exactly_six_binary_targets():
+    assert JIGSAW_LABELS == [
+        "toxic",
+        "severe_toxic",
+        "obscene",
+        "threat",
+        "insult",
+        "identity_hate",
+    ]
+
+
+def test_load_jigsaw_toxicity_csv_validates_binary_labels(tmp_path):
+    csv_path = tmp_path / "jigsaw_sample.csv"
+    csv_path.write_text(
+        "comment_text,toxic,severe_toxic,obscene,threat,insult,identity_hate\n"
+        "Great video,0,0,0,0,0,0\n"
+        "You are stupid,1,0,0,0,1,0\n",
+        encoding="utf-8",
+    )
+
+    records = load_jigsaw_toxicity_csv(csv_path)
+
+    assert len(records) == 2
+    assert records[0]["labels"] == {
+        "toxic": 0,
+        "severe_toxic": 0,
+        "obscene": 0,
+        "threat": 0,
+        "insult": 0,
+        "identity_hate": 0,
+    }
+    assert records[1]["labels"]["insult"] == 1
+
+
+def test_partial_production_loader_keeps_legacy_demo_warning():
+    models = load_models()
+
+    assert models.is_demo is True
+    assert models.model_warning
+    assert models.toxicity is not None
+    assert "demo" in models.model_warning.lower()
+    assert "jigsaw" in models.model_warning.lower()
+
+
+def test_jigsaw_scores_are_reported_without_changing_bullying_verdict():
+    class FixedModel:
+        def __init__(self, label, confidence=0.9):
+            self.label = label
+            self.confidence = confidence
+
+        def predict(self, _text):
+            return {"label": self.label, "confidence": self.confidence}
+
+    class FixedToxicityModel:
+        def predict(self, _text):
+            return {label: 0.95 for label in JIGSAW_LABELS}
+
+    models = load_models()
+    models.sentiment = FixedModel("negative")
+    models.bullying = FixedModel("not_bullying")
+    models.toxicity = FixedToxicityModel()
+
+    summary = analyze_comments(
+        [{"comment_id": "tox-1", "text": "A critical comment."}],
+        models=models,
+    )
+
+    result = summary.comments[0]
+    assert result.is_bullying is False
+    assert result.bullying_label == "not_bullying"
+    assert result.toxicity_scores == {label: 0.95 for label in JIGSAW_LABELS}
+
+
+def test_analysis_template_renders_jigsaw_scores_and_legacy_demo_warning(app):
+    summary = AnalysisSummary(
+        total=1,
+        sentiment_counts={"neutral": 1},
+        bullying_counts={"not_bullying": 1},
+        harmful_count=0,
+        harmful_pct=0.0,
+        is_demo=True,
+        model_warning="Legacy sentiment and bullying outputs are demo.",
+        comments=[
+            CommentResult(
+                comment_id="render-1",
+                text="Example comment",
+                sentiment_label="neutral",
+                sentiment_confidence=0.8,
+                bullying_label="not_bullying",
+                bullying_confidence=0.8,
+                is_bullying=False,
+                toxicity_scores={"toxic": 0.825},
+            )
+        ],
+    )
+
+    with app.test_request_context():
+        html = render_template(
+            "analysis.html",
+            video_id="test-video",
+            summary=summary,
+            empty=False,
+        )
+
+    assert "Legacy sentiment / bullying demo" in html
+    assert "Jigsaw Toxicity Scores" in html
+    assert "82.5%" in html
+    assert "not calibrated probabilities" in html
+
+
+def test_short_social_phrase_requires_review_but_not_harmful():
+    """Ambiguous short phrases should not become harmful without reliable evidence."""
+    class FixedModel:
+        def __init__(self, label, confidence=0.81):
+            self.label = label
+            self.confidence = confidence
+
+        def predict(self, _text):
+            return {"label": self.label, "confidence": self.confidence}
+
+    models = load_models()
+    models.sentiment = FixedModel("negative", confidence=0.81)
+    models.bullying = FixedModel("not_bullying", confidence=0.81)
+    models.is_demo = True
+
+    summary = analyze_comments(
+        [{"comment_id": "s1", "text": "Go 700 Fam 🎉🎉"}],
+        models=models,
+    )
+
+    result = summary.comments[0]
+    assert result.sentiment_label == "negative"
+    assert result.bullying_label == "not_bullying"
+    assert result.is_bullying is False
+    assert result.needs_review is True
 
 
 def test_persistence_stores_and_retrieves_analysis(app):

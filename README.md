@@ -73,6 +73,14 @@ Put that output in `GOOGLE_TOKEN_ENCRYPTION_KEY` in `.env`.
 
 Sentiment and cyberbullying are separate predictions. Negative sentiment alone is not a bullying label. Model evaluation requires a licensed, documented, labeled dataset with sentiment labels (`positive`, `negative`, `neutral`) and cyberbullying labels that include non-bullying plus well-defined harmful categories.
 
+Jigsaw toxicity uses its own six-label multi-label pipeline and does not create sentiment labels. To train or refresh it using the local dataset at `data/raw/train.csv`, run:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.services.ml_pipeline data\raw\train.csv --task jigsaw-toxicity --output-dir models
+```
+
+Jigsaw model scores are shown independently in the analysis results and are not calibrated probabilities or definitive bullying verdicts. Until compatible sentiment and bullying artifacts are trained, those legacy outputs remain labeled as illustrative demo predictions.
+
 Synthetic comments may be used for software tests only. They are not training evidence and must not be presented as model-quality results.
 
 ## Status

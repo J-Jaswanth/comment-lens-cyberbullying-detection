@@ -1,10 +1,15 @@
 import csv
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from app.services.ml_pipeline import (
     CYBERBULLYING_TARGET,
     DatasetValidationError,
+    JIGSAW_LABELS,
+    JigsawToxicityModel,
+    _evaluate_jigsaw_split,
     analyze_comment,
     load_labeled_comments,
     preprocess_comment,
@@ -122,3 +127,34 @@ def test_pipeline_rejects_incomplete_grouped_evaluation(synthetic_records):
 
     with pytest.raises(DatasetValidationError, match="distinct group_id"):
         train_classifier(one_group, "sentiment")
+
+
+def test_jigsaw_model_extracts_positive_scores_from_multioutput_classifier():
+    pipeline = SimpleNamespace(
+        predict_proba=lambda _texts: [[[0.2, 0.8]] for _ in JIGSAW_LABELS],
+        named_steps={
+            "classifier": SimpleNamespace(
+                estimators_=[SimpleNamespace(classes_=np.array([0, 1])) for _ in JIGSAW_LABELS]
+            )
+        },
+    )
+    model = JigsawToxicityModel(pipeline, JIGSAW_LABELS, {})
+
+    scores = model.predict("example comment")
+
+    assert scores == {label: 0.8 for label in JIGSAW_LABELS}
+
+
+def test_jigsaw_split_metrics_report_testable_positive_support():
+    expected = np.array(
+        [[0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0]]
+    )
+    predicted = np.array(
+        [[0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0]]
+    )
+
+    metrics = _evaluate_jigsaw_split(expected, predicted)
+
+    assert metrics["per_label"][JIGSAW_LABELS[0]]["positive_support"] == 1
+    assert metrics["per_label"][JIGSAW_LABELS[1]]["positive_support"] == 1
+    assert set(metrics["confusion_matrices"]) == set(JIGSAW_LABELS)

@@ -944,6 +944,22 @@ a:hover {
   color: var(--text-primary);
 }
 
+.toxicity-score-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 6px;
+  font-size: 0.76rem;
+}
+
+.toxicity-score-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .category-harmful {
   background: var(--glass-red-light);
   border-color: var(--glass-red-border);

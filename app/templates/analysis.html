@@ -25,8 +25,12 @@
 
   {% if summary.is_demo %}
   <div class="demo-banner" id="demo-banner" role="alert">
-    <strong>&#9888; Demo Evaluation Model:</strong>
-    Predictions use representative training patterns. For production research deployments, train on domain-specific datasets using the command line runner.
+    <strong>&#9888; Legacy sentiment / bullying demo:</strong>
+    {% if summary.model_warning %}
+      {{ summary.model_warning }}
+    {% else %}
+      Predictions use representative training patterns. For production research deployments, train on domain-specific datasets using the command line runner.
+    {% endif %}
   </div>
   {% endif %}
 
@@ -124,6 +128,9 @@
             <th scope="col" style="width:50%;">Comment</th>
             <th scope="col">Sentiment</th>
             <th scope="col">Cyberbullying</th>
+            {% if summary.comments and summary.comments[0].toxicity_scores %}
+            <th scope="col">Jigsaw Toxicity Scores</th>
+            {% endif %}
             <th scope="col">Harmful</th>
             <th scope="col">Status</th>
           </tr>
@@ -149,6 +156,19 @@
                 {{ c.bullying_label | replace('_', ' ') }}
               </span>
             </td>
+            {% if summary.comments and summary.comments[0].toxicity_scores %}
+            <td>
+              <ul class="toxicity-score-list" aria-label="Uncalibrated Jigsaw toxicity scores">
+                {% for label, score in c.toxicity_scores.items() %}
+                  <li class="category-item">
+                    <span class="cat-label">{{ label | replace('_', ' ') | title }}</span>
+                    <span class="cat-count">{{ (score * 100) | round(1) }}%</span>
+                  </li>
+                {% endfor %}
+              </ul>
+              <small class="muted-text">Model scores, not calibrated probabilities or a bullying verdict.</small>
+            </td>
+            {% endif %}
             <td>
               {% if c.is_bullying %}
                 <span class="badge badge-bullying">&#10007; Harmful</span>
