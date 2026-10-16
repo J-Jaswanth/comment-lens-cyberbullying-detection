@@ -1,27 +1,111 @@
 {% extends "base.html" %}
-{% block title %}Create account | Comment Lens{% endblock %}
+{% block title %}Create Account — Comment Lens{% endblock %}
 {% block content %}
 <section class="auth-layout">
   <div class="auth-note">
-    <p class="eyebrow">COMMENT LENS / ACCOUNT</p>
-    <h1>A careful look at online conversation.</h1>
-    <p>Create a project account to keep your future analyses private and organized.</p>
+    <p class="eyebrow">COMMENT LENS / RESEARCH & ANALYTICS</p>
+    <h1>A modern lens on digital conversation.</h1>
+    <p>Create your private account to analyze YouTube comment sections, track harmful patterns, and inspect sentiment distribution.</p>
   </div>
-  <div class="auth-panel">
+
+  <div class="glass-panel" id="register-panel">
     <h2>Create account</h2>
-    <p class="form-hint">Use at least 12 characters for your password.</p>
-    <form method="post" novalidate>
+    <p class="form-hint">Passwords must be at least 12 characters.</p>
+
+    <form method="post" novalidate id="register-form">
       {{ form.hidden_tag() }}
-      {% for field in [form.username, form.email, form.password, form.confirm_password] %}
-        <div class="field">
-          {{ field.label }}
-          {{ field(autocomplete="new-password" if field.type == "PasswordField" else "off") }}
-          {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+
+      <div class="field">
+        <label for="username">Username</label>
+        <div class="field-input-wrap">
+          {{ form.username(class_="glass-input", autocomplete="username", placeholder="Choose a unique username") }}
         </div>
-      {% endfor %}
-      {{ form.submit(class_="primary-button") }}
+        {% for error in form.username.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div class="field">
+        <label for="email">Email address</label>
+        <div class="field-input-wrap">
+          {{ form.email(class_="glass-input", autocomplete="email", placeholder="you@example.com") }}
+        </div>
+        {% for error in form.email.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div class="field">
+        <label for="password">Password (12+ characters)</label>
+        <div class="field-input-wrap">
+          {{ form.password(class_="glass-input", autocomplete="new-password", id="reg-password", placeholder="Create a strong password") }}
+          <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" data-target="reg-password">
+            <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+        {% for error in form.password.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div class="field">
+        <label for="confirm_password">Confirm Password</label>
+        <div class="field-input-wrap">
+          {{ form.confirm_password(class_="glass-input", autocomplete="new-password", id="reg-confirm-password", placeholder="Repeat your password") }}
+          <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" data-target="reg-confirm-password">
+            <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+        {% for error in form.confirm_password.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div style="margin-top:28px;">
+        {{ form.submit(class_="primary-button", style="width:100%; min-height:48px;") }}
+      </div>
     </form>
-    <p class="form-footer">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></p>
+
+    <p class="form-footer">
+      Already have an account? <a href="{{ url_for('auth.login') }}"><strong>Sign in</strong></a>
+    </p>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".password-toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const eyeOpen = btn.querySelector(".eye-open");
+    const eyeClosed = btn.querySelector(".eye-closed");
+    if (input.type === "password") {
+      input.type = "text";
+      if (eyeOpen) eyeOpen.style.display = "none";
+      if (eyeClosed) eyeClosed.style.display = "inline";
+    } else {
+      input.type = "password";
+      if (eyeOpen) eyeOpen.style.display = "inline";
+      if (eyeClosed) eyeClosed.style.display = "none";
+    }
+  });
+});
+</script>
 {% endblock %}

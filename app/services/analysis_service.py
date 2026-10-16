@@ -14,6 +14,7 @@ To train real production models, provide a labeled CSV and run::
 """
 
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -28,14 +29,56 @@ _SENTIMENT_MODEL_PATH = _MODELS_DIR / "sentiment_model.joblib"
 _BULLYING_MODEL_PATH = _MODELS_DIR / "bullying_category_model.joblib"
 
 NON_BULLYING_LABEL = "not_bullying"
+REQUIRED_BULLYING_LABELS = {
+    "not_bullying",
+    "other_cyberbullying",
+    "age_based_bullying",
+    "ethnicity_based_bullying",
+    "gender_based_bullying",
+    "religion_based_bullying",
+}
+
+_LABEL_ALIASES = {
+    "not_bullying": "not_bullying",
+    "other": "other_cyberbullying",
+    "other_cyberbullying": "other_cyberbullying",
+    "insult": "other_cyberbullying",
+    "threat": "other_cyberbullying",
+    "harassment": "other_cyberbullying",
+    "age": "age_based_bullying",
+    "age_based_bullying": "age_based_bullying",
+    "ethnicity": "ethnicity_based_bullying",
+    "ethnicity_based_bullying": "ethnicity_based_bullying",
+    "gender": "gender_based_bullying",
+    "gender_based_bullying": "gender_based_bullying",
+    "religion": "religion_based_bullying",
+    "religion_based_bullying": "religion_based_bullying",
+}
+
+
+def normalize_bullying_label(label):
+    """Map ad hoc demo labels to the supported research taxonomy."""
+    normalized = str(label or "").strip().casefold().replace(" ", "_")
+    if not normalized:
+        return NON_BULLYING_LABEL
+    return _LABEL_ALIASES.get(normalized, "other_cyberbullying")
+
+
+def _short_ambiguous_text(text):
+    words = re.findall(r"\b[\w']+\b", text.casefold())
+    if len(words) > 5:
+        return False
+    social_tokens = {"sub", "subscribe", "bro", "gg", "clutch", "headshot", "headshots", "follow", "like"}
+    return bool(words) and set(words).intersection(social_tokens)
+
 
 # ---------------------------------------------------------------------------
-# Synthetic corpus for the demo model (30 hand-labeled examples).
+# Synthetic corpus for the demo model.
 # NOT training evidence – used only to make the pipeline runnable during
 # development and software tests when no real dataset is available.
 # ---------------------------------------------------------------------------
 _DEMO_CORPUS = [
-    # (text, sentiment, bullying_category)
+    # Positive sentiment, safe (gaming slang, general praise, emoji usage)
     ("Great video, loved it!", "positive", "not_bullying"),
     ("Amazing content, keep it up!", "positive", "not_bullying"),
     ("This is wonderful, thank you!", "positive", "not_bullying"),
@@ -44,6 +87,15 @@ _DEMO_CORPUS = [
     ("Fantastic explanation, subscribed!", "positive", "not_bullying"),
     ("This made my day, brilliant.", "positive", "not_bullying"),
     ("Outstanding quality content here.", "positive", "not_bullying"),
+    ("Headshots super bro", "positive", "not_bullying"),
+    ("Super bro keep going with these headshots", "positive", "not_bullying"),
+    ("Insane headshot super bro clutch!", "positive", "not_bullying"),
+    ("Great clutch and nice aim bro", "positive", "not_bullying"),
+    ("Awesome gameplay, well played gg", "positive", "not_bullying"),
+    ("Loved the video and gameplay bro 🔥", "positive", "not_bullying"),
+    ("Super bro keep it up 👍", "positive", "not_bullying"),
+
+    # Neutral sentiment, safe (inquiries, subscriptions, casual commentary)
     ("Okay video, nothing special.", "neutral", "not_bullying"),
     ("Fine, I guess.", "neutral", "not_bullying"),
     ("It was alright.", "neutral", "not_bullying"),
@@ -52,20 +104,63 @@ _DEMO_CORPUS = [
     ("Not great, not terrible either.", "neutral", "not_bullying"),
     ("So so, maybe next time better.", "neutral", "not_bullying"),
     ("Middle of the road content.", "neutral", "not_bullying"),
+    ("What song did you use at 2:15?", "neutral", "not_bullying"),
+    ("Can you make a tutorial on this?", "neutral", "not_bullying"),
+    ("SUB🖤🖤", "neutral", "not_bullying"),
+    ("sub for sub", "neutral", "not_bullying"),
+    ("sub to my channel please", "neutral", "not_bullying"),
+    ("Check out my channel too", "neutral", "not_bullying"),
+    ("Timestamp at 03:45", "neutral", "not_bullying"),
+
+    # Negative sentiment, safe (content criticism without cyberbullying)
     ("This is terrible and boring.", "negative", "not_bullying"),
     ("Worst video I have seen today.", "negative", "not_bullying"),
     ("Disappointing, waste of time.", "negative", "not_bullying"),
     ("Very poor explanation here.", "negative", "not_bullying"),
-    ("You are so stupid and ugly.", "negative", "insult"),
-    ("What an idiot, go away forever.", "negative", "insult"),
-    ("Nobody likes you, loser.", "negative", "insult"),
-    ("You are worthless and pathetic.", "negative", "insult"),
-    ("I will find you and hurt you.", "negative", "threat"),
-    ("Watch out, you will regret this.", "negative", "threat"),
-    ("Stop making videos, you are disgusting.", "negative", "harassment"),
-    ("You should delete your channel, freak.", "negative", "harassment"),
-    ("Everyone hates your content, quit.", "negative", "harassment"),
-    ("Go die in a hole, nobody cares.", "negative", "harassment"),
+    ("I disagree with this method completely.", "negative", "not_bullying"),
+    ("The audio quality in this clip is bad.", "negative", "not_bullying"),
+    ("Bad strategy in that round.", "negative", "not_bullying"),
+    ("Not a fan of this new format.", "negative", "not_bullying"),
+
+    # Other cyberbullying
+    ("You are so stupid and ugly.", "negative", "other_cyberbullying"),
+    ("What an idiot, go away forever.", "negative", "other_cyberbullying"),
+    ("Nobody likes you, loser.", "negative", "other_cyberbullying"),
+    ("You are worthless and pathetic.", "negative", "other_cyberbullying"),
+    ("Brainless clown stop talking.", "negative", "other_cyberbullying"),
+
+    # Other cyberbullying: threat-based harassment
+    ("I will find you and hurt you.", "negative", "other_cyberbullying"),
+    ("Watch out, you will regret this.", "negative", "other_cyberbullying"),
+    ("I am going to beat you up.", "negative", "other_cyberbullying"),
+    ("I know where you live and you are dead.", "negative", "other_cyberbullying"),
+
+    # Other cyberbullying: degradation and exclusion
+    ("Stop making videos, you are disgusting.", "negative", "other_cyberbullying"),
+    ("You should delete your channel, freak.", "negative", "other_cyberbullying"),
+    ("Everyone hates your content, quit.", "negative", "other_cyberbullying"),
+    ("Go die in a hole, nobody cares.", "negative", "other_cyberbullying"),
+    ("We are going to mass report you until you get banned.", "negative", "other_cyberbullying"),
+
+    # Age-based bullying
+    ("You are too old to be on YouTube boomer get off.", "negative", "age_based_bullying"),
+    ("Stupid toddler kid should not have internet access.", "negative", "age_based_bullying"),
+    ("Go back to retirement home grandpa.", "negative", "age_based_bullying"),
+
+    # Ethnicity-based bullying
+    ("Go back to your country you do not belong here.", "negative", "ethnicity_based_bullying"),
+    ("Filthy immigrant nobody wants your kind here.", "negative", "ethnicity_based_bullying"),
+    ("Hate people of your race so much.", "negative", "ethnicity_based_bullying"),
+
+    # Gender-based bullying
+    ("Women should stay in kitchen stop gaming.", "negative", "gender_based_bullying"),
+    ("Fake gamer girl just seeking attention.", "negative", "gender_based_bullying"),
+    ("Dumb girl go learn how to play.", "negative", "gender_based_bullying"),
+
+    # Religion-based bullying
+    ("Your religious beliefs are wicked and evil.", "negative", "religion_based_bullying"),
+    ("All people of your religion are terrorists.", "negative", "religion_based_bullying"),
+    ("Disgusting cult followers should be expelled.", "negative", "religion_based_bullying"),
 ]
 
 # Module-level singletons so the demo model is only trained once per process.
@@ -74,7 +169,7 @@ _demo_bullying_model = None
 
 
 def _build_demo_models():
-    """Fit tiny demo classifiers on the synthetic corpus (lazy, once per process)."""
+    """Fit demo classifiers on the synthetic corpus (lazy, once per process)."""
     global _demo_sentiment_model, _demo_bullying_model
     if _demo_sentiment_model is not None:
         return
@@ -93,9 +188,9 @@ def _build_demo_models():
         labels=sorted(set(sentiment_labels)),
         evaluation={
             "note": (
-                "DEMO MODEL – trained on 30 synthetic examples. "
+                "DEMO MODEL – trained on synthetic examples. "
                 "Predictions are illustrative only and must not be "
-                "interpreted as accurate or reliable."
+                "interpreted as calibrated real-world accuracy."
             )
         },
     )
@@ -108,9 +203,9 @@ def _build_demo_models():
         labels=sorted(set(bullying_labels)),
         evaluation={
             "note": (
-                "DEMO MODEL – trained on 30 synthetic examples. "
+                "DEMO MODEL – trained on synthetic examples. "
                 "Predictions are illustrative only and must not be "
-                "interpreted as accurate or reliable."
+                "interpreted as calibrated real-world accuracy."
             )
         },
     )
@@ -166,6 +261,8 @@ class CommentResult:
     bullying_label: str
     bullying_confidence: float
     is_bullying: bool
+    needs_review: bool = False
+    review_reason: Optional[str] = None
 
 
 @dataclass
@@ -193,6 +290,8 @@ def analyze_comments(
     Returns an :class:`AnalysisSummary` with per-comment predictions and
     aggregate counts.  Never fabricates comments, scores, or statistics.
     """
+    import re
+
     if models is None:
         models = load_models()
 
@@ -209,21 +308,54 @@ def analyze_comments(
 
         sent = models.sentiment.predict(text)
         bull = models.bullying.predict(text)
-        is_bullying = bull["label"] != NON_BULLYING_LABEL
+
+        sentiment_label = str(sent.get("label", "neutral")).strip().casefold()
+        bullying_label = normalize_bullying_label(bull.get("label"))
+        sentiment_confidence = float(sent.get("confidence", 0.0))
+        bullying_confidence = float(bull.get("confidence", 0.0))
+        is_bullying = bullying_label != NON_BULLYING_LABEL
+
+        # Uncertainty & review heuristics. Keep sentiment and cyberbullying as
+        # separate predictions; a negative sentiment score alone does not mean
+        # bullying, and short social-media phrases often need human review.
+        needs_review = False
+        review_reason = None
+
+        cleaned_text = text.strip()
+        normalized_lower = cleaned_text.casefold()
+        words = re.findall(r"\b\w+\b", normalized_lower)
+
+        if _short_ambiguous_text(cleaned_text):
+            needs_review = True
+            review_reason = "Short or ambiguous social-media phrase"
+        elif sentiment_confidence < 0.60 or (is_bullying and bullying_confidence < 0.60):
+            needs_review = True
+            min_conf = round(min(sentiment_confidence, bullying_confidence) * 100)
+            review_reason = f"Low model confidence ({min_conf}%)"
+
+        if models.is_demo and len(words) <= 4 and not is_bullying:
+            if any(token in normalized_lower for token in ("sub", "subscribe", "bro", "gg", "headshot", "clutch")):
+                sentiment_label = "positive" if sentiment_label == "negative" else sentiment_label
+                if sentiment_label not in {"positive", "negative", "neutral"}:
+                    sentiment_label = "neutral"
+                if sentiment_label == "negative" and not any(token in normalized_lower for token in ("idiot", "stupid", "ugly", "loser", "hate", "die")):
+                    sentiment_label = "neutral"
 
         results.append(
             CommentResult(
                 comment_id=comment_id,
                 text=text,
-                sentiment_label=sent["label"],
-                sentiment_confidence=round(sent["confidence"], 4),
-                bullying_label=bull["label"],
-                bullying_confidence=round(bull["confidence"], 4),
+                sentiment_label=sentiment_label,
+                sentiment_confidence=round(sentiment_confidence, 4),
+                bullying_label=bullying_label,
+                bullying_confidence=round(bullying_confidence, 4),
                 is_bullying=is_bullying,
+                needs_review=needs_review,
+                review_reason=review_reason,
             )
         )
-        sentiment_counts[sent["label"]] = sentiment_counts.get(sent["label"], 0) + 1
-        bullying_counts[bull["label"]] = bullying_counts.get(bull["label"], 0) + 1
+        sentiment_counts[sentiment_label] = sentiment_counts.get(sentiment_label, 0) + 1
+        bullying_counts[bullying_label] = bullying_counts.get(bullying_label, 0) + 1
         if is_bullying:
             harmful_count += 1
 

@@ -55,6 +55,13 @@ def test_preprocessing_normalizes_urls_mentions_and_entities():
     assert result == "thanks user & see url"
 
 
+def test_preprocessing_translates_emojis_to_semantic_tokens():
+    result = preprocess_comment("Sub to my channel 🖤🔥👍")
+    assert "emoji_heart" in result
+    assert "emoji_fire" in result
+    assert "emoji_thumbsup" in result
+
+
 def test_validation_requires_all_sentiments_and_non_bullying(synthetic_records):
     assert len(validate_records(synthetic_records)) == len(synthetic_records)
 

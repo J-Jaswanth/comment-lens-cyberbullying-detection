@@ -1,50 +1,402 @@
-﻿{% extends "base.html" %}
-{% block title %}Dashboard | Comment Lens{% endblock %}
+{% extends "base.html" %}
+{% block title %}Video Dashboard — Comment Lens{% endblock %}
 {% block content %}
 
 <div class="dash-header">
   <div>
-    <p class="eyebrow">YOUTUBE / DASHBOARD</p>
-    <h1>Your videos</h1>
-    <p class="muted-text">Select a video to analyse its comments for sentiment and cyberbullying.</p>
+    <p class="eyebrow">YOUTUBE / WORKSPACE</p>
+    <h1>Your YouTube Videos</h1>
+    <p class="muted-text">Browse your accessible uploads, filter Shorts or regular videos, and analyze audience comments for sentiment and cyberbullying.</p>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <a href="{{ url_for('analysis.dashboard') }}" class="secondary-button" id="refresh-dashboard-btn" title="Refresh video list">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+      </svg>
+      Refresh
+    </a>
   </div>
 </div>
 
 {% if videos %}
+  <!-- Real-Time Search & Category Filters -->
+  <div class="dashboard-controls-bar">
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="video-search-input" class="search-input" placeholder="Search videos by title..." autocomplete="off">
+    </div>
+
+    <div class="filter-group">
+      <button type="button" class="filter-pill active" data-filter="all">All</button>
+      <button type="button" class="filter-pill" data-filter="video">Regular Videos</button>
+      <button type="button" class="filter-pill" data-filter="short">Shorts</button>
+      <button type="button" class="filter-pill" data-filter="analyzed">Previously Analyzed</button>
+    </div>
+
+    <div class="video-stats-counter" id="video-counter">
+      Showing <span id="displayed-count">{{ videos | length }}</span> videos
+    </div>
+  </div>
+
+  <!-- Video Cards Grid -->
   <ul class="video-grid" id="video-list">
     {% for video in videos %}
-      <li class="video-card" id="video-card-{{ video.video_id }}">
-        {% if video.thumbnail_url %}
-          <div class="video-thumb-wrap">
-            <img class="video-thumb" src="{{ video.thumbnail_url }}" alt="Thumbnail for {{ video.title | e }}" loading="lazy" width="120" height="90">
-          </div>
-        {% else %}
-          <div class="video-thumb-wrap video-thumb-placeholder" aria-hidden="true"></div>
-        {% endif %}
-        <div class="video-meta">
-          <p class="video-title">{{ video.title | e }}</p>
-          {% if video.published_at %}
-            <p class="video-date muted-text">{{ video.published_at[:10] }}</p>
+      <li class="video-card" id="video-card-{{ video.video_id }}" data-video-id="{{ video.video_id }}" data-type="{{ video.video_type or ('short' if video.is_short else 'video') }}" data-title="{{ video.title | lower | e }}" data-analyzed="{{ 'true' if video.saved_analysis else 'false' }}">
+        <div class="video-thumb-container">
+          {% if video.thumbnail_url %}
+            <img class="video-thumb" src="{{ video.thumbnail_url }}" alt="Thumbnail for {{ video.title | e }}" loading="lazy">
+          {% else %}
+            <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1c1c1e; color:#71717a;">
+              <span>No Preview</span>
+            </div>
           {% endif %}
-          <a class="primary-button primary-link analyse-btn"
-             href="{{ url_for('analysis.analyze_video', video_id=video.video_id) }}"
-             id="analyse-btn-{{ video.video_id }}">
-            Analyse comments
-          </a>
+          
+          {% if video.is_short or video.video_type == 'short' %}
+            <span class="video-type-badge badge-short">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              Short
+            </span>
+          {% else %}
+            <span class="video-type-badge">Video</span>
+          {% endif %}
+        </div>
+
+        <div class="video-body">
+          <h3 class="video-title" title="{{ video.title | e }}">{{ video.title | e }}</h3>
+          
+          {% if video.description %}
+            <p class="video-desc" title="{{ video.description | e }}">{{ video.description[:140] }}...</p>
+          {% endif %}
+
+          <div class="video-meta-metrics">
+            {% if video.published_at %}
+              <span class="metric-item" title="Published date">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                {{ video.published_at[:10] }}
+              </span>
+            {% endif %}
+
+            {% if video.view_count is not none %}
+              <span class="metric-item" title="Total views">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                {{ '{:,}'.format(video.view_count) }}
+              </span>
+            {% endif %}
+
+            {% if video.like_count is not none %}
+              <span class="metric-item" title="Likes">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                </svg>
+                {{ '{:,}'.format(video.like_count) }}
+              </span>
+            {% endif %}
+
+            {% if video.comment_count is not none %}
+              <span class="metric-item" title="Comments">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                {{ '{:,}'.format(video.comment_count) }}
+              </span>
+            {% endif %}
+          </div>
+
+          <!-- Compact Saved Analysis Summary -->
+          {% if video.saved_analysis %}
+            <div class="card-analysis-preview">
+              <div class="card-analysis-header">
+                <span>Previous Analysis:</span>
+                {% if video.saved_analysis.harmful_pct == 0 %}
+                  <span class="analysis-status-pill status-safe">&#10003; 0% Harmful</span>
+                {% elif video.saved_analysis.harmful_pct < 10 %}
+                  <span class="analysis-status-pill status-warning">&#9888; {{ video.saved_analysis.harmful_pct }}% Harmful</span>
+                {% else %}
+                  <span class="analysis-status-pill status-harmful">&#9888; {{ video.saved_analysis.harmful_pct }}% Harmful</span>
+                {% endif %}
+              </div>
+              <div class="sentiment-mini-bar" title="Positive / Neutral / Negative sentiment distribution">
+                {% set pos = video.saved_analysis.sentiment_counts.get('positive', 0) %}
+                {% set neu = video.saved_analysis.sentiment_counts.get('neutral', 0) %}
+                {% set neg = video.saved_analysis.sentiment_counts.get('negative', 0) %}
+                {% set tot = video.saved_analysis.total or 1 %}
+                <div class="bar-segment bar-pos" style="width: {{ (pos / tot * 100) | round }}%"></div>
+                <div class="bar-segment bar-neu" style="width: {{ (neu / tot * 100) | round }}%"></div>
+                <div class="bar-segment bar-neg" style="width: {{ (neg / tot * 100) | round }}%"></div>
+              </div>
+              <span style="font-size:0.75rem; color:var(--text-tertiary);">{{ video.saved_analysis.total }} comments analysed</span>
+            </div>
+          {% else %}
+            <div class="card-analysis-preview" style="background:transparent; border-style:dashed;">
+              <div class="card-analysis-header">
+                <span style="color:var(--text-tertiary);">Status:</span>
+                <span class="analysis-status-pill status-none">Not analyzed yet</span>
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="card-action-wrap">
+            <a class="primary-button analyse-btn"
+               href="{{ url_for('analysis.analyze_video', video_id=video.video_id) }}"
+               id="analyse-btn-{{ video.video_id }}">
+              {% if video.saved_analysis %}Re-analyse Comments{% else %}Analyse Comments{% endif %} &rarr;
+            </a>
+          </div>
         </div>
       </li>
     {% endfor %}
   </ul>
-  {% if next_page_token %}
-    <p class="muted-text page-note">Showing the first 25 videos. YouTube API pagination is available if needed.</p>
-  {% endif %}
+
+  <!-- Load More Button Section -->
+  <div class="load-more-section" id="load-more-wrap" {% if not next_page_token %}style="display:none;"{% endif %}>
+    <button type="button" class="secondary-button" id="load-more-btn" data-next-token="{{ next_page_token or '' }}">
+      <span class="btn-text">Load More Videos</span>
+      <span class="loading-spinner" style="display:none;"></span>
+    </button>
+    <p class="muted-text" id="pagination-status" style="font-size:0.84rem;">Click to load additional videos from YouTube.</p>
+  </div>
+
+  <!-- Search Empty State -->
+  <div class="empty-state" id="search-empty-state" style="display:none; margin-top:20px;">
+    <p class="empty-icon">&#128269;</p>
+    <h3>No matching videos found</h3>
+    <p class="muted-text">Try adjusting your search keywords or filter selection.</p>
+    <button type="button" class="secondary-button" id="clear-search-btn" style="margin-top:14px;">Clear Search</button>
+  </div>
+
 {% else %}
   <div class="empty-state" id="empty-videos">
-    <p class="empty-icon" aria-hidden="true">&#9654;</p>
-    <p>No videos found for this YouTube channel.</p>
-    <p class="muted-text">If you have just connected your account, try refreshing this page.</p>
-    <a href="{{ url_for('analysis.dashboard') }}" class="primary-button primary-link">Refresh</a>
+    <p class="empty-icon">&#9654;</p>
+    <h3>No videos found</h3>
+    <p class="muted-text">This YouTube channel doesn't appear to have any uploaded videos or Shorts available to this account.</p>
+    <a href="{{ url_for('analysis.dashboard') }}" class="primary-button" style="margin-top:16px;">Refresh Dashboard</a>
   </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("video-search-input");
+  const filterPills = document.querySelectorAll(".filter-pill");
+  const videoCards = document.querySelectorAll(".video-card");
+  const videoList = document.getElementById("video-list");
+  const displayedCount = document.getElementById("displayed-count");
+  const searchEmpty = document.getElementById("search-empty-state");
+  const clearSearchBtn = document.getElementById("clear-search-btn");
+  const loadMoreBtn = document.getElementById("load-more-btn");
+  const loadMoreWrap = document.getElementById("load-more-wrap");
+  const paginationStatus = document.getElementById("pagination-status");
+
+  let currentFilter = "all";
+  let currentSearch = "";
+  const knownVideoIds = new Set();
+
+  // Populate known IDs
+  document.querySelectorAll(".video-card").forEach(c => {
+    if (c.dataset.videoId) knownVideoIds.add(c.dataset.videoId);
+  });
+
+  function applyFilters() {
+    let visible = 0;
+    const cards = document.querySelectorAll(".video-card");
+    cards.forEach(card => {
+      const type = card.dataset.type || "video";
+      const title = card.dataset.title || "";
+      const isAnalyzed = card.dataset.analyzed === "true";
+
+      const matchesSearch = !currentSearch || title.includes(currentSearch);
+      let matchesFilter = true;
+      if (currentFilter === "short") matchesFilter = (type === "short");
+      else if (currentFilter === "video") matchesFilter = (type === "video");
+      else if (currentFilter === "analyzed") matchesFilter = isAnalyzed;
+
+      if (matchesSearch && matchesFilter) {
+        card.style.display = "";
+        visible++;
+      } else {
+        card.style.display = "none";
+      }
+    });
+
+    if (displayedCount) displayedCount.textContent = visible;
+    if (searchEmpty) {
+      searchEmpty.style.display = (visible === 0 && cards.length > 0) ? "flex" : "none";
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      currentSearch = e.target.value.trim().toLowerCase();
+      applyFilters();
+    });
+  }
+
+  filterPills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      filterPills.forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      currentFilter = pill.dataset.filter;
+      applyFilters();
+    });
+  });
+
+  if (clearSearchBtn && searchInput) {
+    clearSearchBtn.addEventListener("click", () => {
+      searchInput.value = "";
+      currentSearch = "";
+      filterPills.forEach(p => p.classList.remove("active"));
+      document.querySelector('.filter-pill[data-filter="all"]').classList.add("active");
+      currentFilter = "all";
+      applyFilters();
+    });
+  }
+
+  // Load More Dynamic Pagination
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener("click", async () => {
+      const pageToken = loadMoreBtn.dataset.nextToken;
+      if (!pageToken) return;
+
+      const btnText = loadMoreBtn.querySelector(".btn-text");
+      const spinner = loadMoreBtn.querySelector(".loading-spinner");
+      loadMoreBtn.disabled = true;
+      if (btnText) btnText.textContent = "Loading videos...";
+      if (spinner) spinner.style.display = "inline-block";
+      if (paginationStatus) paginationStatus.textContent = "Retrieving next page from YouTube...";
+
+      try {
+        const response = await fetch(`/api/youtube/videos?pageToken=${encodeURIComponent(pageToken)}&maxResults=25`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        const items = data.items || [];
+        const nextToken = data.next_page_token;
+
+        let addedCount = 0;
+        items.forEach(v => {
+          if (knownVideoIds.has(v.video_id)) return; // Prevent duplicate
+          knownVideoIds.add(v.video_id);
+          addedCount++;
+
+          const li = document.createElement("li");
+          li.className = "video-card";
+          li.id = `video-card-${v.video_id}`;
+          li.dataset.videoId = v.video_id;
+          li.dataset.type = v.video_type || (v.is_short ? "short" : "video");
+          li.dataset.title = (v.title || "").toLowerCase();
+          li.dataset.analyzed = v.saved_analysis ? "true" : "false";
+
+          const isShort = (v.video_type === "short" || v.is_short);
+          const typeBadge = isShort 
+            ? `<span class="video-type-badge badge-short"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Short</span>`
+            : `<span class="video-type-badge">Video</span>`;
+
+          const viewsFormatted = (v.view_count !== null && v.view_count !== undefined) 
+            ? `<span class="metric-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> ${Number(v.view_count).toLocaleString()}</span>` 
+            : '';
+
+          const likesFormatted = (v.like_count !== null && v.like_count !== undefined)
+            ? `<span class="metric-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg> ${Number(v.like_count).toLocaleString()}</span>`
+            : '';
+
+          const commentsFormatted = (v.comment_count !== null && v.comment_count !== undefined)
+            ? `<span class="metric-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> ${Number(v.comment_count).toLocaleString()}</span>`
+            : '';
+
+          let analysisPreview = '';
+          if (v.saved_analysis) {
+            const hPct = v.saved_analysis.harmful_pct || 0;
+            const statusClass = hPct === 0 ? 'status-safe' : (hPct < 10 ? 'status-warning' : 'status-harmful');
+            const statusIcon = hPct === 0 ? '&#10003;' : '&#9888;';
+            const pos = (v.saved_analysis.sentiment_counts && v.saved_analysis.sentiment_counts.positive) || 0;
+            const neu = (v.saved_analysis.sentiment_counts && v.saved_analysis.sentiment_counts.neutral) || 0;
+            const neg = (v.saved_analysis.sentiment_counts && v.saved_analysis.sentiment_counts.negative) || 0;
+            const tot = v.saved_analysis.total || 1;
+            analysisPreview = `
+              <div class="card-analysis-preview">
+                <div class="card-analysis-header">
+                  <span>Previous Analysis:</span>
+                  <span class="analysis-status-pill ${statusClass}">${statusIcon} ${hPct}% Harmful</span>
+                </div>
+                <div class="sentiment-mini-bar">
+                  <div class="bar-segment bar-pos" style="width: ${Math.round(pos / tot * 100)}%"></div>
+                  <div class="bar-segment bar-neu" style="width: ${Math.round(neu / tot * 100)}%"></div>
+                  <div class="bar-segment bar-neg" style="width: ${Math.round(neg / tot * 100)}%"></div>
+                </div>
+                <span style="font-size:0.75rem; color:var(--text-tertiary);">${v.saved_analysis.total} comments analysed</span>
+              </div>
+            `;
+          } else {
+            analysisPreview = `
+              <div class="card-analysis-preview" style="background:transparent; border-style:dashed;">
+                <div class="card-analysis-header">
+                  <span style="color:var(--text-tertiary);">Status:</span>
+                  <span class="analysis-status-pill status-none">Not analyzed yet</span>
+                </div>
+              </div>
+            `;
+          }
+
+          li.innerHTML = `
+            <div class="video-thumb-container">
+              <img class="video-thumb" src="${v.thumbnail_url || ''}" alt="Thumbnail" loading="lazy">
+              ${typeBadge}
+            </div>
+            <div class="video-body">
+              <h3 class="video-title">${v.title || 'Untitled'}</h3>
+              ${v.description ? `<p class="video-desc">${v.description.substring(0, 140)}...</p>` : ''}
+              <div class="video-meta-metrics">
+                ${v.published_at ? `<span class="metric-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${v.published_at.substring(0, 10)}</span>` : ''}
+                ${viewsFormatted}
+                ${likesFormatted}
+                ${commentsFormatted}
+              </div>
+              ${analysisPreview}
+              <div class="card-action-wrap">
+                <a class="primary-button analyse-btn" href="/analyze/${encodeURIComponent(v.video_id)}" id="analyse-btn-${v.video_id}">
+                  ${v.saved_analysis ? 'Re-analyse Comments' : 'Analyse Comments'} &rarr;
+                </a>
+              </div>
+            </div>
+          `;
+          videoList.appendChild(li);
+        });
+
+        if (nextToken) {
+          loadMoreBtn.dataset.nextToken = nextToken;
+          loadMoreBtn.disabled = false;
+          if (btnText) btnText.textContent = "Load More Videos";
+          if (paginationStatus) paginationStatus.textContent = `Loaded ${addedCount} more videos. More available.`;
+        } else {
+          loadMoreWrap.style.display = "none";
+        }
+        applyFilters();
+      } catch (err) {
+        loadMoreBtn.disabled = false;
+        if (btnText) btnText.textContent = "Retry Load More";
+        if (paginationStatus) paginationStatus.textContent = `Error loading videos: ${err.message}.`;
+      } finally {
+        if (spinner) spinner.style.display = "none";
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

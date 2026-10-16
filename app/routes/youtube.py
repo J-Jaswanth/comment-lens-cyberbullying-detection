@@ -8,11 +8,16 @@ from requests.exceptions import RequestException
 
 from app.services.google_oauth import OAuthConfigurationError
 from app.services.youtube_api import (
+    YouTubeAPIConfigurationError,
     YouTubeAPIError,
+    YouTubeAuthenticationError,
+    YouTubeCommentsDisabled,
     YouTubeDataService,
+    YouTubeInsufficientPermissions,
     YouTubeNotConnected,
     YouTubeQuotaExceeded,
     YouTubeResourceUnavailable,
+    YouTubeVideoNotFound,
     create_youtube_client,
 )
 
@@ -28,6 +33,8 @@ def _get_service():
         )
     except YouTubeNotConnected:
         return None, (jsonify(error="Connect a YouTube account first."), 409)
+    except YouTubeAuthenticationError:
+        return None, (jsonify(error="Your YouTube authentication is expired or invalid. Please reconnect your account."), 401)
     except OAuthConfigurationError:
         current_app.logger.exception("Google token configuration is invalid.")
         return None, (jsonify(error="Google token configuration is invalid."), 503)
@@ -53,6 +60,16 @@ def _run_page(operation):
         return jsonify(operation())
     except YouTubeQuotaExceeded:
         return jsonify(error="YouTube API quota is exhausted. Try again after quota resets."), 429
+    except YouTubeInsufficientPermissions:
+        return jsonify(error="Your YouTube authorization does not have permission to access comments. Please reconnect your account."), 403
+    except YouTubeAuthenticationError:
+        return jsonify(error="Your YouTube authentication is expired or invalid. Please reconnect your account."), 401
+    except YouTubeCommentsDisabled:
+        return jsonify(error="Comments are disabled for this video."), 403
+    except YouTubeVideoNotFound:
+        return jsonify(error="The requested video or resource was not found."), 404
+    except YouTubeAPIConfigurationError:
+        return jsonify(error="YouTube Data API is not enabled in your Google Cloud project."), 503
     except YouTubeResourceUnavailable:
         return jsonify(error="This video or its comments are unavailable to this account."), 404
     except YouTubeAPIError:
@@ -67,7 +84,23 @@ def list_videos():
     service, error_response = _get_service()
     if error_response:
         return error_response
-    return _run_page(lambda: service.list_videos(page_token, max_results))
+
+    def _fetch():
+        result = service.list_videos(page_token, max_results)
+        items = result.get("items", [])
+        video_ids = [v["video_id"] for v in items]
+        analysis_store = current_app.config.get("ANALYSIS_STORE")
+        if analysis_store and video_ids:
+            try:
+                saved = analysis_store.get_analyses_for_videos(current_user.id, video_ids)
+                for v in items:
+                    v["saved_analysis"] = saved.get(v["video_id"])
+            except Exception:
+                pass
+        return result
+
+    return _run_page(_fetch)
+
 
 
 @youtube.get("/videos/<video_id>/comments")

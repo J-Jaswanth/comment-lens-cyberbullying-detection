@@ -39,12 +39,67 @@ class TextClassifier:
         return {"label": str(label), "confidence": float(confidence)}
 
 
+EMOJI_MAP = {
+    "🖤": " emoji_heart ",
+    "❤️": " emoji_heart ",
+    "💖": " emoji_heart ",
+    "💕": " emoji_heart ",
+    "💓": " emoji_heart ",
+    "💗": " emoji_heart ",
+    "💘": " emoji_heart ",
+    "💙": " emoji_heart ",
+    "💚": " emoji_heart ",
+    "💛": " emoji_heart ",
+    "💜": " emoji_heart ",
+    "🤍": " emoji_heart ",
+    "🤎": " emoji_heart ",
+    "🔥": " emoji_fire ",
+    "👍": " emoji_thumbsup ",
+    "👏": " emoji_clap ",
+    "😂": " emoji_laugh ",
+    "🤣": " emoji_laugh ",
+    "😹": " emoji_laugh ",
+    "💀": " emoji_skull ",
+    "☠️": " emoji_skull ",
+    "💯": " emoji_hundred ",
+    "😍": " emoji_love ",
+    "🥰": " emoji_love ",
+    "😘": " emoji_love ",
+    "😊": " emoji_smile ",
+    "😀": " emoji_smile ",
+    "😃": " emoji_smile ",
+    "😄": " emoji_smile ",
+    "😁": " emoji_smile ",
+    "😎": " emoji_cool ",
+    "😢": " emoji_sad ",
+    "😭": " emoji_sad ",
+    "😞": " emoji_sad ",
+    "😔": " emoji_sad ",
+    "🙁": " emoji_sad ",
+    "☹️": " emoji_sad ",
+    "😡": " emoji_angry ",
+    "😠": " emoji_angry ",
+    "🤬": " emoji_angry ",
+    "🤮": " emoji_disgust ",
+    "🤢": " emoji_disgust ",
+    "🖕": " emoji_middlefinger ",
+    "💩": " emoji_poop ",
+    "🤡": " emoji_clown ",
+    "👑": " emoji_crown ",
+    "🎯": " emoji_target ",
+}
+
+
 def preprocess_comment(text):
-    """Normalize surface noise while retaining words and punctuation cues."""
+    """Normalize surface noise while retaining words, emojis, and punctuation cues."""
     text = html.unescape(text or "")
     text = re.sub(r"<[^>]*>", " ", text)
     text = re.sub(r"https?://\S+|www\.\S+", " URL ", text, flags=re.IGNORECASE)
     text = re.sub(r"(?<!\w)@[\w.-]+", " USER ", text)
+    for char, replacement in EMOJI_MAP.items():
+        if char in text:
+            text = text.replace(char, replacement)
+    text = re.sub(r"[\ufe0e\ufe0f\U0001f3fb-\U0001f3ff]", "", text)
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
@@ -105,6 +160,7 @@ def _make_pipeline():
                     preprocessor=preprocess_comment,
                     lowercase=False,
                     ngram_range=(1, 2),
+                    token_pattern=r"(?u)\b\w+\b",
                     min_df=1,
                     max_features=50000,
                     sublinear_tf=True,

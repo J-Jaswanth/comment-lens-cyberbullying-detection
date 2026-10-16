@@ -4,6 +4,11 @@ from cryptography.fernet import Fernet, InvalidToken
 from google_auth_oauthlib.flow import Flow
 
 YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+YOUTUBE_FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
+YOUTUBE_SCOPES = [
+    YOUTUBE_READONLY_SCOPE,
+    YOUTUBE_FORCE_SSL_SCOPE,
+]
 
 
 class OAuthConfigurationError(ValueError):
@@ -51,7 +56,7 @@ def build_google_flow(config, state=None, code_verifier=None):
     }
     return Flow.from_client_config(
         client_config,
-        scopes=[YOUTUBE_READONLY_SCOPE],
+        scopes=YOUTUBE_SCOPES,
         redirect_uri=config["GOOGLE_REDIRECT_URI"],
         state=state,
         code_verifier=code_verifier,

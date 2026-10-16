@@ -1,12 +1,13 @@
-﻿{% extends "base.html" %}
-{% block title %}{{ title }} | Comment Lens{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ title }} — Comment Lens{% endblock %}
 {% block content %}
-<div class="error-state-page" id="error-state">
-  <p class="eyebrow">ERROR</p>
-  <h1>{{ title }}</h1>
-  <p class="muted-text">{{ message }}</p>
+<div class="glass-panel" id="error-state" style="max-width:680px; margin:40px auto; text-align:center; padding:48px 36px;">
+  <div style="font-size:3rem; margin-bottom:14px;" aria-hidden="true">&#9888;</div>
+  <p class="eyebrow" style="color:var(--glass-red);">NOTICE / ERROR</p>
+  <h1 style="font-size:2.2rem; font-weight:800; letter-spacing:-0.02em; margin:6px 0 14px;">{{ title }}</h1>
+  <p class="muted-text" style="font-size:1.05rem; line-height:1.6; margin-bottom:28px;">{{ message }}</p>
   {% if action_url and action_label %}
-    <a class="primary-button primary-link" href="{{ action_url }}" id="error-action-btn">{{ action_label }}</a>
+    <a class="primary-button" href="{{ action_url }}" id="error-action-btn" style="min-height:46px; padding:0 24px;">{{ action_label }}</a>
   {% endif %}
 </div>
 {% endblock %}

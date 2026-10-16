@@ -1,26 +1,81 @@
 {% extends "base.html" %}
-{% block title %}Sign in | Comment Lens{% endblock %}
+{% block title %}Sign in — Comment Lens{% endblock %}
 {% block content %}
-<section class="auth-layout auth-layout-login">
+<section class="auth-layout">
   <div class="auth-note">
-    <p class="eyebrow">COMMENT LENS / PRIVATE WORKSPACE</p>
-    <h1>Welcome back.</h1>
-    <p>Your account will hold your own analysis history as the project grows.</p>
+    <p class="eyebrow">COMMENT LENS / SECURE ACCESS</p>
+    <h1>Welcome back to Comment Lens.</h1>
+    <p>Analyze YouTube audience sentiment, identify cyberbullying patterns, and inspect comment threats in a refined glass workspace.</p>
   </div>
-  <div class="auth-panel">
+
+  <div class="glass-panel" id="login-panel">
     <h2>Sign in</h2>
-    <form method="post" novalidate>
+    <p class="form-hint">Enter your credentials to access your dashboard.</p>
+
+    <form method="post" novalidate id="login-form">
       {{ form.hidden_tag() }}
-      {% for field in [form.identifier, form.password] %}
-        <div class="field">
-          {{ field.label }}
-          {{ field(autocomplete="current-password" if field.type == "PasswordField" else "username") }}
-          {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+
+      <div class="field">
+        <label for="identifier">Username or Email</label>
+        <div class="field-input-wrap">
+          {{ form.identifier(class_="glass-input", autocomplete="username", placeholder="e.g. alex or alex@example.com") }}
         </div>
-      {% endfor %}
-      {{ form.submit(class_="primary-button") }}
+        {% for error in form.identifier.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="field-input-wrap">
+          {{ form.password(class_="glass-input", autocomplete="current-password", id="login-password", placeholder="Enter your password") }}
+          <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility" data-target="login-password">
+            <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          </button>
+        </div>
+        {% for error in form.password.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      </div>
+
+      <div style="margin-top:28px;">
+        {{ form.submit(class_="primary-button", style="width:100%; min-height:48px;") }}
+      </div>
     </form>
-    <p class="form-footer">New here? <a href="{{ url_for('auth.register') }}">Create an account</a></p>
+
+    <p class="form-footer">
+      New here? <a href="{{ url_for('auth.register') }}"><strong>Create a project account</strong></a>
+    </p>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".password-toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const eyeOpen = btn.querySelector(".eye-open");
+    const eyeClosed = btn.querySelector(".eye-closed");
+    if (input.type === "password") {
+      input.type = "text";
+      if (eyeOpen) eyeOpen.style.display = "none";
+      if (eyeClosed) eyeClosed.style.display = "inline";
+    } else {
+      input.type = "password";
+      if (eyeOpen) eyeOpen.style.display = "inline";
+      if (eyeClosed) eyeClosed.style.display = "none";
+    }
+  });
+});
+</script>
 {% endblock %}

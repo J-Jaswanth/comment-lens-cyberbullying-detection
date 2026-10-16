@@ -11,6 +11,7 @@ from app.config import Config
 from app.models.user import User
 from app.models.google_oauth_store import MongoGoogleOAuthStore
 from app.models.user_store import MongoUserStore
+from app.models.analysis_store import MongoAnalysisStore
 from app.services.google_oauth import OAuthConfigurationError, validate_token_encryption_key
 
 csrf = CSRFProtect()
@@ -37,6 +38,10 @@ def create_app(test_config=None):
 		)
 	if "OAUTH_STORE" not in app.config:
 		app.config["OAUTH_STORE"] = MongoGoogleOAuthStore(
+			app.config["MONGODB_URI"], app.config["MONGODB_DB_NAME"]
+		)
+	if "ANALYSIS_STORE" not in app.config:
+		app.config["ANALYSIS_STORE"] = MongoAnalysisStore(
 			app.config["MONGODB_URI"], app.config["MONGODB_DB_NAME"]
 		)
 

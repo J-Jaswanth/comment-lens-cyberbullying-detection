@@ -15,6 +15,18 @@ from app.models.user_store import UserAlreadyExists
 auth = Blueprint("auth", __name__)
 
 
+def _mongo_storage_error_message(error):
+    detail = f"{type(error).__name__}: {error}".strip()
+    if not detail or detail == ":":
+        detail = "MongoDB connection failed."
+    base = "Account storage is unavailable. Check your MongoDB setup."
+    if "SSL" in detail or "TLS" in detail or "handshake" in detail.lower():
+        return f"{base} The database connection failed during TLS/SSL setup: {detail}"
+    if "timeout" in detail.lower() or "selection" in detail.lower():
+        return f"{base} The database did not respond in time: {detail}"
+    return f"{base} Details: {detail}"
+
+
 def _safe_next_url(candidate):
     if not candidate:
         return None
@@ -35,9 +47,9 @@ def _safe_next_url(candidate):
 def home():
     try:
         youtube_connected = current_app.config["OAUTH_STORE"].has_credentials(current_user.id)
-    except PyMongoError:
+    except PyMongoError as error:
         current_app.logger.exception("Could not load the YouTube connection status.")
-        return "Account storage is unavailable. Check your MongoDB setup.", 503
+        return _mongo_storage_error_message(error), 503
     return render_template("home.html", youtube_connected=youtube_connected)
 
 
@@ -59,9 +71,9 @@ def register():
         except UserAlreadyExists:
             flash("An account may already exist for those details.", "error")
             return render_template("auth/register.html", form=form), 409
-        except PyMongoError:
+        except PyMongoError as error:
             current_app.logger.exception("Account registration failed.")
-            flash("Account storage is unavailable. Check your MongoDB setup.", "error")
+            flash(_mongo_storage_error_message(error), "error")
             return render_template("auth/register.html", form=form), 503
         flash("Your account is ready. Please sign in.", "success")
         return redirect(url_for("auth.login"))
@@ -77,9 +89,9 @@ def login():
     if form.validate_on_submit():
         try:
             user = current_app.config["USER_STORE"].get_by_login(form.identifier.data)
-        except PyMongoError:
+        except PyMongoError as error:
             current_app.logger.exception("Account sign-in lookup failed.")
-            flash("Account storage is unavailable. Check your MongoDB setup.", "error")
+            flash(_mongo_storage_error_message(error), "error")
             return render_template("auth/login.html", form=form), 503
         if user and check_password_hash(user.password_hash, form.password.data):
             session.clear()

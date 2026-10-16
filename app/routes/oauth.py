@@ -25,6 +25,18 @@ STATE_SESSION_KEY = "google_oauth_state"
 VERIFIER_SESSION_KEY = "google_oauth_code_verifier"
 
 
+def _mongo_storage_error_message(error):
+    detail = f"{type(error).__name__}: {error}".strip()
+    if not detail or detail == ":":
+        detail = "MongoDB connection failed."
+    base = "Secure token storage is unavailable. Check your MongoDB setup."
+    if "SSL" in detail or "TLS" in detail or "handshake" in detail.lower():
+        return f"{base} The database connection failed during TLS/SSL setup: {detail}"
+    if "timeout" in detail.lower() or "selection" in detail.lower():
+        return f"{base} The database did not respond in time: {detail}"
+    return f"{base} Details: {detail}"
+
+
 def _log_oauth_failure(stage, category, description):
     current_app.logger.warning(
         "Google OAuth failure stage=%s category=%s description=%s",
@@ -179,7 +191,7 @@ def google_callback():
             type(error).__name__,
             "Encrypted credentials could not be saved to account storage.",
         )
-        flash("Google connected, but secure token storage is unavailable.", "error")
+        flash(_mongo_storage_error_message(error), "error")
         return redirect(url_for("auth.home"))
 
     flash("YouTube access was connected and the credentials were encrypted for this account.", "success")

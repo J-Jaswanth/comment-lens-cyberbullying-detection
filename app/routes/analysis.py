@@ -11,6 +11,7 @@ from flask import (
     jsonify,
     redirect,
     render_template,
+    request,
     url_for,
 )
 from flask_login import current_user, login_required
@@ -21,11 +22,16 @@ from requests.exceptions import RequestException
 from app.services.analysis_service import AnalysisSummary, analyze_comments, load_models
 from app.services.google_oauth import OAuthConfigurationError
 from app.services.youtube_api import (
+    YouTubeAPIConfigurationError,
     YouTubeAPIError,
+    YouTubeAuthenticationError,
+    YouTubeCommentsDisabled,
     YouTubeDataService,
+    YouTubeInsufficientPermissions,
     YouTubeNotConnected,
     YouTubeQuotaExceeded,
     YouTubeResourceUnavailable,
+    YouTubeVideoNotFound,
     create_youtube_client,
 )
 
@@ -54,6 +60,14 @@ def _get_youtube_service():
             "message": "Connect your YouTube account first.",
             "action_url": url_for("oauth.connect_google"),
             "action_label": "Connect YouTube with Google",
+        })
+    except YouTubeAuthenticationError:
+        current_app.logger.warning("YouTube authentication expired or invalid.")
+        return None, ("error_state.html", {
+            "title": "Authentication expired",
+            "message": "Your YouTube access has expired or was revoked. Please reconnect your account.",
+            "action_url": url_for("oauth.connect_google"),
+            "action_label": "Reconnect YouTube with Google",
         })
     except OAuthConfigurationError:
         current_app.logger.exception("Google token configuration invalid.")
@@ -85,7 +99,7 @@ def dashboard():
         template, ctx = error
         return render_template(template, **ctx), 503
 
-    page_token = None          # first page only; pagination added via JS if needed
+    page_token = request.args.get("pageToken")
     try:
         result = service.list_videos(page_token=page_token, max_results=25)
     except YouTubeQuotaExceeded:
@@ -96,6 +110,30 @@ def dashboard():
             action_url=url_for("auth.home"),
             action_label="Back to home",
         ), 429
+    except YouTubeInsufficientPermissions:
+        return render_template(
+            "error_state.html",
+            title="Permission needed",
+            message="Your connected YouTube account lacks required permissions. Please reconnect your account.",
+            action_url=url_for("oauth.connect_google"),
+            action_label="Reconnect YouTube with Google",
+        ), 403
+    except YouTubeAuthenticationError:
+        return render_template(
+            "error_state.html",
+            title="Authentication expired",
+            message="Your YouTube session has expired or been revoked. Please reconnect your account.",
+            action_url=url_for("oauth.connect_google"),
+            action_label="Reconnect YouTube with Google",
+        ), 401
+    except YouTubeAPIConfigurationError:
+        return render_template(
+            "error_state.html",
+            title="API configuration issue",
+            message="YouTube Data API v3 is not enabled in your Google Cloud Console project.",
+            action_url=url_for("auth.home"),
+            action_label="Back to home",
+        ), 503
     except YouTubeResourceUnavailable:
         return render_template(
             "error_state.html",
@@ -116,11 +154,26 @@ def dashboard():
 
     videos = result.get("items", [])
     next_page_token = result.get("next_page_token")
+
+    # Attach saved analyses if available
+    video_ids = [v["video_id"] for v in videos]
+    analysis_store = current_app.config.get("ANALYSIS_STORE")
+    saved_analyses = {}
+    if analysis_store:
+        try:
+            saved_analyses = analysis_store.get_analyses_for_videos(current_user.id, video_ids)
+        except Exception:
+            current_app.logger.warning("Could not retrieve saved analyses for dashboard.")
+
+    for v in videos:
+        v["saved_analysis"] = saved_analyses.get(v["video_id"])
+
     return render_template(
         "dashboard.html",
         videos=videos,
         next_page_token=next_page_token,
     )
+
 
 
 # ---------------------------------------------------------------------------
@@ -170,13 +223,58 @@ def analyze_video(video_id):
             action_url=url_for("analysis.dashboard"),
             action_label="Back to dashboard",
         ), 429
+    except YouTubeInsufficientPermissions:
+        current_app.logger.warning("Insufficient permissions to fetch comments for video %s", video_id)
+        return render_template(
+            "error_state.html",
+            title="Permission needed",
+            message=(
+                "Your connected YouTube account does not have permission to retrieve comments. "
+                "Please reconnect your YouTube account to grant comment access."
+            ),
+            action_url=url_for("oauth.connect_google"),
+            action_label="Reconnect YouTube with Google",
+        ), 403
+    except YouTubeAuthenticationError:
+        current_app.logger.warning("YouTube authentication invalid or expired for video %s", video_id)
+        return render_template(
+            "error_state.html",
+            title="Authentication expired",
+            message="Your YouTube session has expired or been revoked. Please reconnect your account.",
+            action_url=url_for("oauth.connect_google"),
+            action_label="Reconnect YouTube with Google",
+        ), 401
+    except YouTubeCommentsDisabled:
+        return render_template(
+            "error_state.html",
+            title="Comments disabled",
+            message="Comments are disabled on this video.",
+            action_url=url_for("analysis.dashboard"),
+            action_label="Back to dashboard",
+        ), 403
+    except YouTubeVideoNotFound:
+        return render_template(
+            "error_state.html",
+            title="Video unavailable",
+            message="The requested video was not found or is private.",
+            action_url=url_for("analysis.dashboard"),
+            action_label="Back to dashboard",
+        ), 404
+    except YouTubeAPIConfigurationError:
+        current_app.logger.error("YouTube Data API v3 is not configured in Google Cloud for video %s", video_id)
+        return render_template(
+            "error_state.html",
+            title="API configuration issue",
+            message="YouTube Data API v3 is not enabled in your Google Cloud Console project.",
+            action_url=url_for("analysis.dashboard"),
+            action_label="Back to dashboard",
+        ), 503
     except YouTubeResourceUnavailable:
         return render_template(
             "error_state.html",
             title="Comments unavailable",
             message=(
-                "Comments are disabled for this video, or the video is "
-                "private/restricted for this account."
+                "Comments are unavailable for this video or restricted for this account."
             ),
             action_url=url_for("analysis.dashboard"),
             action_label="Back to dashboard",
@@ -190,6 +288,7 @@ def analyze_video(video_id):
             action_url=url_for("analysis.dashboard"),
             action_label="Back to dashboard",
         ), 502
+
 
     comment_items = result.get("items", [])
 
@@ -205,6 +304,23 @@ def analyze_video(video_id):
     try:
         models = load_models()
         summary = analyze_comments(comment_items, models=models)
+        analysis_store = current_app.config.get("ANALYSIS_STORE")
+        if analysis_store:
+            try:
+                analysis_store.save_analysis(
+                    current_user.id,
+                    video_id,
+                    {
+                        "total": summary.total,
+                        "harmful_count": summary.harmful_count,
+                        "harmful_pct": summary.harmful_pct,
+                        "sentiment_counts": summary.sentiment_counts,
+                        "bullying_counts": summary.bullying_counts,
+                        "is_demo": summary.is_demo,
+                    },
+                )
+            except Exception:
+                current_app.logger.warning("Could not persist analysis summary for video %s", video_id)
     except Exception:
         current_app.logger.exception(
             "Analysis pipeline failed for video %s", video_id
@@ -223,3 +339,4 @@ def analyze_video(video_id):
         summary=summary,
         empty=False,
     )
+

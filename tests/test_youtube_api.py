@@ -95,19 +95,60 @@ def test_list_comments_and_replies_use_official_comment_endpoints():
     )
 
 
+from app.services.google_oauth import YOUTUBE_FORCE_SSL_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_SCOPES
+from app.services.youtube_api import (
+    YouTubeAPIConfigurationError,
+    YouTubeAPIError,
+    YouTubeAuthenticationError,
+    YouTubeCommentsDisabled,
+    YouTubeDataService,
+    YouTubeInsufficientPermissions,
+    YouTubeQuotaExceeded,
+    YouTubeResourceUnavailable,
+    YouTubeVideoNotFound,
+    _execute,
+)
+
+
+def test_scopes_include_readonly_and_force_ssl():
+    assert YOUTUBE_READONLY_SCOPE in YOUTUBE_SCOPES
+    assert YOUTUBE_FORCE_SSL_SCOPE in YOUTUBE_SCOPES
+    assert YOUTUBE_FORCE_SSL_SCOPE == "https://www.googleapis.com/auth/youtube.force-ssl"
+
+
 @pytest.mark.parametrize(
-    ("reason", "exception"),
+    ("status", "reason", "exception"),
     [
-        ("quotaExceeded", YouTubeQuotaExceeded),
-        ("commentsDisabled", YouTubeResourceUnavailable),
+        ("403", "quotaExceeded", YouTubeQuotaExceeded),
+        ("429", "rateLimitExceeded", YouTubeQuotaExceeded),
+        ("403", "commentsDisabled", YouTubeCommentsDisabled),
+        ("403", "commentsDisabled", YouTubeResourceUnavailable),
+        ("403", "insufficientPermissions", YouTubeInsufficientPermissions),
+        ("403", "accessNotConfigured", YouTubeAPIConfigurationError),
+        ("401", "authError", YouTubeAuthenticationError),
+        ("404", "videoNotFound", YouTubeVideoNotFound),
+        ("404", "videoNotFound", YouTubeResourceUnavailable),
+        ("403", "forbidden", YouTubeResourceUnavailable),
+        ("500", "backendError", YouTubeAPIError),
     ],
 )
-def test_api_error_reasons_become_safe_domain_errors(reason, exception):
-    response = Response({"status": "403"})
-    response.reason = "Forbidden"
+def test_api_error_reasons_become_safe_domain_errors(status, reason, exception):
+    response = Response({"status": status})
+    response.reason = "Error"
     content = f'{{"error":{{"errors":[{{"reason":"{reason}"}}]}}}}'.encode()
     request = MagicMock()
     request.execute.side_effect = HttpError(response, content)
 
     with pytest.raises(exception):
         _execute(request)
+
+
+def test_insufficient_scopes_in_error_message_raises_permission_error():
+    response = Response({"status": "403"})
+    response.reason = "Forbidden"
+    content = b'{"error":{"message":"Request had insufficient authentication scopes.","errors":[{"message":"Insufficient Permission","reason":"insufficientPermissions"}]}}'
+    request = MagicMock()
+    request.execute.side_effect = HttpError(response, content)
+
+    with pytest.raises(YouTubeInsufficientPermissions):
+        _execute(request)

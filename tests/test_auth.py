@@ -1,3 +1,4 @@
+from pymongo.errors import ServerSelectionTimeoutError
 from werkzeug.security import check_password_hash
 
 from app.routes.auth import _safe_next_url
@@ -71,6 +72,24 @@ def test_login_rejects_external_next_url(client):
 
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/")
+
+
+def test_login_surfaces_mongodb_ssl_handshake_failure(client, monkeypatch):
+    register(client)
+
+    def broken_lookup(identifier):
+        raise ServerSelectionTimeoutError("SSL handshake failed: tlsv1 alert internal error")
+
+    monkeypatch.setattr(client.application.config["USER_STORE"], "get_by_login", broken_lookup)
+
+    response = client.post(
+        "/auth/login",
+        data={"identifier": "student_1", "password": "strong-password-123"},
+    )
+
+    assert response.status_code == 503
+    assert b"SSL handshake failed" in response.data
+    assert b"MongoDB" in response.data
 
 
 def test_safe_next_url_rejects_protocol_relative_and_backslash_paths():

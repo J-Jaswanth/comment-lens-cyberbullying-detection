@@ -3,21 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Comment Lens{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Comment Lens — YouTube Analytics{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{{ url_for('auth.home') }}">Comment Lens <span>PROJECT</span></a>
+    <a class="brand" href="{{ url_for('auth.home') }}">
+      <span class="brand-icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </span>
+      <span>Comment Lens</span>
+      <span class="badge-pro">B.Tech</span>
+    </a>
     <nav aria-label="Account">
       {% if current_user.is_authenticated %}
-        <span class="nav-user">{{ current_user.username }}</span>
+        <a href="{{ url_for('analysis.dashboard') }}" class="secondary-button" style="height:34px; font-size:0.84rem; padding: 0 14px;">Dashboard</a>
+        <span class="nav-user-badge">
+          <span class="nav-user-dot" aria-hidden="true"></span>
+          <span>{{ current_user.username }}</span>
+        </span>
         <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="text-button" type="submit">Sign out</button>
+          <button class="glass-nav-button" type="submit" id="sign-out-btn">Sign out</button>
         </form>
       {% else %}
-        <a href="{{ url_for('auth.login') }}">Sign in</a>
+        <a href="{{ url_for('auth.login') }}" class="secondary-button">Sign in</a>
+        <a href="{{ url_for('auth.register') }}" class="primary-button" style="height:36px; padding: 0 16px;">Get Started</a>
       {% endif %}
     </nav>
   </header>
@@ -26,12 +45,13 @@
       {% if messages %}
         <div class="flash-stack" role="status" aria-live="polite">
           {% for category, message in messages %}
-            <p class="flash flash-{{ category }}">{{ message }}</p>
+            <div class="flash flash-{{ category }}">{{ message }}</div>
           {% endfor %}
         </div>
       {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

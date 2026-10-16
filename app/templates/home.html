@@ -1,15 +1,40 @@
-﻿{% extends "base.html" %}
-{% block title %}Your workspace | Comment Lens{% endblock %}
+{% extends "base.html" %}
+{% block title %}Workspace — Comment Lens{% endblock %}
 {% block content %}
-<section class="welcome-panel">
-  <p class="eyebrow">ACCOUNT / READY</p>
-  <h1>Welcome, {{ current_user.username }}.</h1>
+<section class="glass-panel" style="max-width:880px; margin:20px auto; padding:44px;">
+  <p class="eyebrow">COMMENT LENS / WORKSPACE</p>
+  <h1 style="font-size:2.6rem; font-weight:800; letter-spacing:-0.03em; margin:8px 0 16px;">
+    Welcome, {{ current_user.username }}.
+  </h1>
+
   {% if youtube_connected %}
-    <p class="connection-status">YouTube account connected.</p>
-    <a class="primary-button primary-link" href="{{ url_for('analysis.dashboard') }}" id="go-dashboard-btn">Go to Dashboard &rarr;</a>
+    <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; background:var(--glass-green-light); border:1px solid var(--glass-green-border); border-radius:var(--radius-full); color:#15803d; font-weight:600; font-size:0.9rem; margin-bottom:24px;">
+      <span style="width:8px; height:8px; border-radius:50%; background:var(--glass-green);"></span>
+      YouTube Account Connected
+    </div>
+    <p class="muted-text" style="font-size:1.05rem; line-height:1.6; margin-bottom:28px;">
+      Your official Google OAuth connection is active. Browse your uploads, inspect video statistics, and analyze audience comments for sentiment and cyberbullying patterns.
+    </p>
+    <div style="display:flex; gap:14px; flex-wrap:wrap;">
+      <a class="primary-button" href="{{ url_for('analysis.dashboard') }}" id="go-dashboard-btn" style="min-height:48px; padding:0 26px;">
+        Open Video Dashboard &rarr;
+      </a>
+      <a class="secondary-button" href="{{ url_for('oauth.connect_google') }}" id="reconnect-youtube-btn" style="min-height:48px;">
+        Reconnect / Update Scopes
+      </a>
+    </div>
   {% else %}
-    <p>Connect through Google authorization. You will never enter your Google password in this application.</p>
-    <a class="primary-button primary-link" href="{{ url_for('oauth.connect_google') }}" id="connect-youtube-btn">Connect YouTube with Google</a>
+    <p class="muted-text" style="font-size:1.05rem; line-height:1.6; margin-bottom:28px;">
+      Connect your YouTube account through official Google OAuth. Comment Lens securely requests permission to view videos and comments without accessing your private passwords.
+    </p>
+    <div>
+      <a class="primary-button" href="{{ url_for('oauth.connect_google') }}" id="connect-youtube-btn" style="min-height:48px; padding:0 26px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+        Connect YouTube with Google
+      </a>
+    </div>
   {% endif %}
 </section>
 {% endblock %}

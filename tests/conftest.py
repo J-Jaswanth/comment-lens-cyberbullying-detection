@@ -57,6 +57,26 @@ class FakeOAuthStore:
         self.credentials.pop(str(user_id), None)
 
 
+class FakeAnalysisStore:
+    def __init__(self):
+        self.analyses = {}
+
+    def save_analysis(self, user_id, video_id, summary_data):
+        self.analyses[(str(user_id), str(video_id))] = summary_data
+
+    def get_analysis(self, user_id, video_id):
+        data = self.analyses.get((str(user_id), str(video_id)))
+        return {"summary": data} if data else None
+
+    def get_analyses_for_videos(self, user_id, video_ids):
+        result = {}
+        for vid in video_ids:
+            key = (str(user_id), str(vid))
+            if key in self.analyses:
+                result[str(vid)] = self.analyses[key]
+        return result
+
+
 @pytest.fixture
 def account_store():
     return FakeUserStore()
@@ -68,12 +88,17 @@ def oauth_store():
 
 
 @pytest.fixture
+def analysis_store():
+    return FakeAnalysisStore()
+
+
+@pytest.fixture
 def test_encryption_key():
     return Fernet.generate_key().decode("ascii")
 
 
 @pytest.fixture
-def app(account_store, oauth_store, test_encryption_key):
+def app(account_store, oauth_store, analysis_store, test_encryption_key):
     return create_app(
         {
             "TESTING": True,
@@ -82,6 +107,7 @@ def app(account_store, oauth_store, test_encryption_key):
             "RATELIMIT_ENABLED": False,
             "USER_STORE": account_store,
             "OAUTH_STORE": oauth_store,
+            "ANALYSIS_STORE": analysis_store,
             "GOOGLE_CLIENT_ID": None,
             "GOOGLE_CLIENT_SECRET": None,
             "GOOGLE_REDIRECT_URI": "http://127.0.0.1:5000/auth/google/callback",
